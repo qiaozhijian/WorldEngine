@@ -115,7 +115,9 @@ All RLFT configs fine-tune a **pretrained IL model** (`e2e_vadv2_50pct_ep8.pth`)
 
 ### RL Loss Weights
 
-All RLFT configs use the same loss configuration:
+> **Note:** The `rl_loss_weight` in the provided configs is **not** a fully stabilized configuration. The balance between `PG` (policy gradient) and `entropy` (entropy regularization) is sensitive to the data distribution and training scenario. Users should treat the default values as a starting point and tune them based on their own experiments.
+
+The default RLFT configs use the following loss weights:
 
 ```python
 rl_loss_weight=dict(
@@ -125,6 +127,11 @@ rl_loss_weight=dict(
     entropy=1.0    # entropy regularization
 )
 ```
+
+General tuning guidance:
+- **PG weight**: Controls how aggressively the model exploits reward signals. Higher values lead to faster reward-driven updates but risk instability; lower values are more conservative.
+- **entropy weight**: Encourages exploration and prevents premature convergence. Higher values help when the policy collapses to a narrow set of trajectories; lower values allow sharper optimization toward high-reward behaviors.
+- A good starting point for real-log RLFT is `PG=1.0, entropy=0.2`. For synthetic rollout data, `PG=0.01, entropy=1.0` may work better due to the different reward distribution.
 
 ### LoRA Configuration
 
@@ -229,7 +236,7 @@ Key fields:
 |-----------|------|------|
 | `rl_finetuning` | `True` | `False` |
 | `reward_shaping` | `True` | `False` |
-| `rl_loss_weight` | `dict(bce=0, rank=0, PG=0.01, entropy=1.0)` | N/A |
+| `rl_loss_weight` | `dict(bce=0, rank=0, PG=1.0, entropy=0.2)` (needs tuning) | N/A |
 | `orig_IL` | `True` | N/A |
 | `evaluation.interval` | 8 | 1 (every epoch) |
 

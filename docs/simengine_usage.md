@@ -76,7 +76,7 @@ bash scripts/run_ray_distributed_rollout.sh \
     $WORLDENGINE_ROOT/projects/AlgEngine/configs/worldengine/e2e_vadv2_50pct.py \
     $WORLDENGINE_ROOT/data/alg_engine/ckpts/e2e_vadv2_50pct_ep8.pth \
     e2e_vadv2_50pct \
-    navtrain_50pct_collision \ 
+    navtrain_50pct_collision \
     navtrain
 ```
 
