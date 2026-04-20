@@ -226,11 +226,6 @@ WorldEngine's simulation environments are powered by 3D Gaussian Splatting (MTGS
 
 If any parts of our work help your research, please consider citing us and giving a star to our repository:
 
-```bibtex
-
-
-```
-
 If you use the Render Assets (MTGS), please also cite:
 ```bibtex
 @article{li2025mtgs,
