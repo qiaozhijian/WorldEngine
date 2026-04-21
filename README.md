@@ -21,7 +21,6 @@
 </p>
 </div>
 
->  Joint effort by OpenDriveLab at The University of Hong Kong, Huawei Inc. and Shanghai Innovation Institute (SII).
 
 ## Table of Contents
 - [Highlights](#highlights)
