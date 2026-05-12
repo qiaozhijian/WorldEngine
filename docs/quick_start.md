@@ -113,7 +113,7 @@ The quick test script calls `scripts/run_testing.sh` (or `run_ray_distributed_te
    - SimEngine sends camera images + sensor data to AlgEngine
    - AlgEngine predicts trajectory
    - SimEngine executes trajectory and renders next frame
-   - Repeat for 20 steps per scenario
+   - Repeat for 12 steps per scenario (4 history + 8 simulation steps)
 
 4. **Computes Metrics**
    - SimEngine evaluates using PDM (Planning Deviation Metric)
