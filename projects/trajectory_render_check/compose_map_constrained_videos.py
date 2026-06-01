@@ -36,6 +36,24 @@ def short_token(scene_id: str) -> str:
 
 
 def sorted_frames(render_root: Path, scene_id: str) -> list[Path]:
+    meta_pkl = render_root / "meta_datas" / f"{scene_id}.pkl"
+    sensor_root = render_root / "sensor_blobs"
+    if meta_pkl.exists():
+        with meta_pkl.open("rb") as f:
+            frames = pickle.load(f)
+        if not isinstance(frames, list):
+            raise TypeError(f"Expected list in {meta_pkl}, got {type(frames)}")
+
+        ordered_paths: list[Path] = []
+        for frame in frames:
+            data_path = frame["cams"]["CAM_F0"]["data_path"]
+            image_path = sensor_root / data_path
+            if not image_path.exists():
+                raise FileNotFoundError(f"Missing rendered frame referenced by {meta_pkl}: {image_path}")
+            ordered_paths.append(image_path)
+        return ordered_paths
+
+    # Fallback for ad-hoc render folders that do not have meta_datas.
     folder = render_root / "sensor_blobs" / short_token(scene_id) / "CAM_F0"
     frames: list[tuple[int, Path]] = []
     for path in folder.glob("*.jpg"):

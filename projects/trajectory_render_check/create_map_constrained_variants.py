@@ -129,6 +129,48 @@ def find_safe_offset(
     return final_offset, pos, heading, vel, stats
 
 
+def original_drivable_stats(scene: dict, cfg: VariantConfig) -> dict:
+    area = build_drivable_area(scene)
+    if area is None:
+        return {
+            "center_ok": 0,
+            "footprint_ok": 0,
+            "bad_center_frames": list(range(min(cfg.render_frames, 20))),
+            "bad_footprint_frames": list(range(min(cfg.render_frames, 20))),
+            "is_valid": False,
+            "reason": "missing_drivable_area",
+        }
+
+    tracks = {track_id: resample_track(track, cfg) for track_id, track in scene["object_track"].items()}
+    ego_state = tracks[scene["sdc_id"]]["state"]
+    base_pos = np.asarray(ego_state["position"][: cfg.num_frames], dtype=np.float64)
+    base_heading = np.asarray(ego_state["heading"][: cfg.num_frames], dtype=np.float64)
+    length, width = ego_dimensions(scene)
+    pos, heading, _ = local_lateral_variant(base_pos, base_heading, 0.0, cfg)
+    return drivable_stats(area, pos, heading, length, width, cfg.render_frames)
+
+
+def filter_valid_original_scenes(
+    scenes: dict,
+    cfg: VariantConfig,
+    *,
+    max_scenes: int | None,
+) -> tuple[dict, dict]:
+    selected: dict = {}
+    skipped: dict = {}
+    for scene_id, scene in scenes.items():
+        stats = original_drivable_stats(scene, cfg)
+        if not stats["is_valid"]:
+            skipped[scene_id] = stats
+            continue
+        selected[scene_id] = scene
+        if max_scenes is not None and len(selected) >= max_scenes:
+            break
+    if not selected:
+        raise ValueError("No valid scenes selected after drivable-area filtering")
+    return selected, skipped
+
+
 def build_variants(scenes: dict, cfg: VariantConfig, search_iters: int) -> tuple[dict, dict]:
     variant_scenes: dict = {}
     report: dict = {}
@@ -211,6 +253,12 @@ def main() -> None:
     parser.add_argument("--asset-root", type=Path, default=None)
     parser.add_argument("--exclude-scene-id", action="append", default=[])
     parser.add_argument("--max-scenes", type=int, default=None)
+    parser.add_argument(
+        "--skip-invalid-original",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Skip base scenes whose original ego footprint is not fully inside drivable polygons.",
+    )
     parser.add_argument("--target-offset-m", type=float, default=3.0)
     parser.add_argument("--num-frames", type=int, default=82)
     parser.add_argument("--render-frames", type=int, default=82)
@@ -229,15 +277,21 @@ def main() -> None:
         all_scenes = pickle.load(f)
 
     scene_ids = load_scene_ids(args.scene_ids_file) if args.scene_ids_file else None
-    scenes = select_scenes(
+    candidate_scenes = select_scenes(
         all_scenes,
         scene_ids=scene_ids,
         asset_root=args.asset_root,
         exclude_scene_ids=args.exclude_scene_id,
-        max_scenes=args.max_scenes,
+        max_scenes=None if args.skip_invalid_original else args.max_scenes,
     )
+    if args.skip_invalid_original:
+        scenes, skipped = filter_valid_original_scenes(candidate_scenes, cfg, max_scenes=args.max_scenes)
+    else:
+        scenes, skipped = candidate_scenes, {}
 
     variant_scenes, report = build_variants(scenes, cfg, args.search_iters)
+    if skipped:
+        report["_skipped_invalid_original"] = skipped
     args.output_pkl.parent.mkdir(parents=True, exist_ok=True)
     with args.output_pkl.open("wb") as f:
         pickle.dump(variant_scenes, f, protocol=pickle.HIGHEST_PROTOCOL)
@@ -246,7 +300,11 @@ def main() -> None:
 
     print(f"Wrote {len(variant_scenes)} variant scenarios to {args.output_pkl}")
     print(f"Wrote constraint report to {args.report_json}")
+    if skipped:
+        print(f"Skipped {len(skipped)} base scenes whose original footprint was outside drivable polygons")
     for scene_id, item in report.items():
+        if scene_id.startswith("_"):
+            continue
         offsets = {name: round(variant["actual_offset_m"], 3) for name, variant in item["variants"].items()}
         valid = {name: variant["is_valid"] for name, variant in item["variants"].items()}
         print(scene_id, offsets, valid)
