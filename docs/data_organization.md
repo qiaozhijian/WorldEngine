@@ -21,7 +21,7 @@ WorldEngine/
 
 ## Data Download
 
-We provide pre-processed datasets and model checkpoints via **[ModelScope](https://www.modelscope.cn/datasets/OpenDriveLab/WorldEngine)** and **Hugging Face[https://huggingface.co/datasets/OpenDriveLab/WorldEngine]**.
+We provide pre-processed datasets and model checkpoints via **[ModelScope](https://www.modelscope.cn/datasets/OpenDriveLab/WorldEngine)** and **[Hugging Face](https://huggingface.co/datasets/OpenDriveLab/WorldEngine)**.
 
 ### Option 1: Download from ModelScope (Recommended for Users in China)
 
@@ -117,29 +117,59 @@ data/alg_engine/
 
 ### 3. SimEngine Data (`data/sim_engine/`)
 
-Data for closed-loop simulation.
+Data for closed-loop simulation. Sizes below are from the [OpenDriveLab/WorldEngine](https://huggingface.co/datasets/OpenDriveLab/WorldEngine) Hugging Face release (dataset total **~4.89 TB**; `sim_engine/` **~4.81 TB**).
+
+**On Hugging Face (as downloaded)** — scene assets are split tarballs; scenarios are single `.pkl` files:
 
 ```bash
-data/sim_engine/
-├── assets/                        # Scene assets for simulation
-│   ├── navtest
-│   ├── navtrain
-│   └── navtest_failures
+data/sim_engine/                                          # ~4.81 TB
+├── assets/                                               # ~4.76 TB
+│   ├── navtrain/                                         # ~4.18 TB, 129× part*.tar.gz + configs.tar.gz
+│   ├── navtest/                                          # ~489 GB,  15× part*.tar.gz + configs.tar.gz
+│   └── navtest_failures/                                 # ~88 GB,   3× part*.tar.gz + configs.tar.gz
+│       ├── assets/
+│       │   ├── part001.tar.gz
+│       │   ├── part002.tar.gz
+│       │   └── ...
+│       └── configs.tar.gz
 │
-└── scenarios/                     # Scenario configurations
-    ├── original/                  # Original logged scenarios
-    │   ├── navtest_failures/
-    │   ├── navtrain_50pct_collision/
-    │   ├── navtrain_ep_per1/
-    │   ├── navtrain_failures_per1/
-    │   └── navtrain_hydramdp_failures/
+└── scenarios/                                            # ~49 GB
+    ├── original/                                         # ~33 GB
+    │   ├── navtest_failures/all_scenarios.pkl            # ~912 MB
+    │   ├── navtrain_50pct_collision/all_scenarios.pkl    # ~19 GB
+    │   ├── navtrain_ep_per1/all_scenarios.pkl            # ~2.5 GB
+    │   ├── navtrain_failures_per1/all_scenarios.pkl      # ~2.6 GB
+    │   └── navtrain_hydramdp_failures/all_scenarios.pkl  # ~7.5 GB
     │
-    └── augmented/                 # Augmented scenarios (from BWM)
-        ├── navtrain_50pct_collision/
-        ├── navtrain_50pct_ep_1pct/
-        └── navtrain_50pct_offroad/
-
+    └── augmented/                                        # ~16 GB, from BWM
+        ├── navtrain_50pct_collision/all_scenarios.pkl    # ~3.1 GB
+        ├── navtrain_50pct_ep_1pct/all_scenarios.pkl      # ~5.0 GB
+        └── navtrain_50pct_offroad/all_scenarios.pkl      # ~7.9 GB
 ```
+
+Extract `configs.tar.gz` and every `part*.tar.gz` under each split (see HF Usage step 2). Archives unpack with a `{split}/assets/{road_block_name}/...` prefix; after extraction, SimEngine expects the layout below.
+
+**`assets/{navtrain,navtest,navtest_failures}/` — after extraction:**
+
+```bash
+navtrain/                                                 # navtest / navtest_failures: same tree
+├── configs/                                              # from configs.tar.gz
+│   ├── {road_block_name}.yaml
+│   └── ...
+└── assets/
+    ├── {road_block_name}/
+    │   ├── background/
+    │   │   └── {road_block_name}.ckpt              # dict: background, skybox, rigid_object_*
+    │   └── road_height_map/
+    │       ├── road_height_map.npy
+    │       ├── sim2.json
+    │       └── road_height_map_preview.png
+    ├── {road_block_name_2}/
+    │   └── ...
+    └── ...
+```
+
+Verified against HF file listing (174 files), `part001.tar.gz` contents, and extracted `navtest_failures` assets (290 blocks, identical 4-file layout per block). **`video_scene_dict.pkl` is not shipped on Hugging Face**; it is only read by the internal DigitalTwin scenario conversion script (`digitaltwin_nuplan_converter_navsim_filter.py`). SimEngine runtime loads `{road_block_name}.ckpt` via `MTGSAssetManager`; `road_height_map/` is present in release assets but currently unused in code.
 
 ---
 
